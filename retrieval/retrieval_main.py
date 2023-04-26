@@ -9,13 +9,13 @@ import math
 
 def read_dict():
 
-    with open('../data/dict_BW.pkl', 'rb') as f:
+    with open('../data/myExperiment/dict_BW_myExperiment.pkl', 'rb') as f:
         dict_BW = pickle.load(f)
-    with open('../data/dict_GED.pkl', 'rb') as f:
+    with open('../data/myExperiment/dict_GED_myExperiment.pkl', 'rb') as f:
         dict_GED = pickle.load(f)
-    with open('../data/dict_MS.pkl', 'rb') as f:
+    with open('../data/myExperiment/dict_MS_myExperiment.pkl', 'rb') as f:
         dict_MS = pickle.load(f)
-    with open('../data/dict_PS.pkl', 'rb') as f:
+    with open('../data/myExperiment/dict_PS_myExperiment.pkl', 'rb') as f:
         dict_PS = pickle.load(f)
 
     return dict_BW, dict_GED, dict_MS, dict_PS

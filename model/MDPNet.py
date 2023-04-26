@@ -3,6 +3,8 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from sklearn.metrics import r2_score
+import copy
 
 
 class MDP_Net(nn.Module):
@@ -74,6 +76,90 @@ class MDP_Net(nn.Module):
         out = torch.sigmoid(self.layer5(hidden_4_out))
 
         return out
+
+def evaluate(data_loader, net, criterion):
+    net.eval()
+    eval_loss = 0
+    eval_r2 = 0
+    with torch.no_grad():
+        for i, data in enumerate(data_loader, 0):
+            " Prepare data "
+            eval_x, eval_y = data
+            if torch.cuda.is_available():
+                eval_x = eval_x.cuda(0)
+                eval_y = eval_y.cuda(0)
+            " Forward "
+            out = net(eval_x)
+            loss = criterion(out, eval_y)
+            eval_loss += loss.data.item()
+
+            true = eval_y.cpu().numpy()
+            pred = out.cpu().detach().numpy()
+            eval_r2 += r2_score(true, pred)
+
+        eval_loss = eval_loss / len(data_loader)
+        eval_r2 = eval_r2 / len(data_loader)
+        return eval_loss, eval_r2
+
+def train(train_loader, val_loader, test_loader, num_epochs, criterion, optimizer):
+    model = MDP_Net(768, 8, 512, 512, 256, 256, 1)
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    val_r2_max = -1000
+    train_loss_list = []  # 用于画图
+    val_loss_list = []
+    train_r2_list = []
+    val_r2_list = []
+
+    print("Start Training...")
+    add = 0
+    for epoch in range(1, num_epochs + 1):
+        model.train()
+        for i, data in enumerate(train_loader, 0):
+            " Prepare data "
+            train_x, train_y = data
+            if torch.cuda.is_available():
+                train_x = train_x.cuda(0)
+                train_y = train_y.cuda(0)
+            " Forward "
+            out = model(train_x)
+            loss = criterion(out, train_y)
+            train_loss = loss.data.item()
+            if i == 10:
+                print("-----------------------------")
+                print(epoch, i, train_loss)
+            " Backward "
+            optimizer.zero_grad()  # 梯度置0
+            loss.backward()
+            " Update "
+            optimizer.step()
+
+        if epoch % 1 == 0:
+            val_loss, val_r2 = evaluate(val_loader, model, criterion)  # evaluation of validation set
+            train_loss1, train_r2 = evaluate(train_loader, model, criterion)  # evaluation of training set
+            val_loss_list.append(val_loss)
+            train_loss_list.append(train_loss)
+            val_r2_list.append(val_r2)
+            train_r2_list.append(train_r2)
+
+            if val_r2 > val_r2_max:
+                val_r2_max = val_r2
+                model_best = copy.deepcopy(model)
+                epoch_best = epoch
+            print(
+                f'epoch: {epoch}, Train Loss:{train_loss:.6f}, Train R2:{train_r2:.6f}, Val Loss:{val_loss:.6f}, Val R2:{val_r2:.6f}')
+
+        if len(train_loss_list) >= 2:
+            add = add+1 if train_loss_list[-1] > train_loss_list[-2] else 0
+            if add >= 5:
+                print("Exit Training...")
+                print(epoch_best, val_r2_max)
+                test_loss, test_r2 = evaluate(test_loader, model, criterion)  # evaluation of testing set
+                print(f'Results----Test Loss:{test_loss:.6f}, Test R2:{test_r2:.6f}')
+                break
+
+    return model_best
 
 
 
